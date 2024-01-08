@@ -37,7 +37,7 @@ void parsefail(const char *prg);
 
 int parseuint(const char *str, int upperlimit, int lowerlimit);
 
-void readableint(char *ha, int hardnum, size_t strmax);
+char *readableint(char *ha, int hardnum, size_t strmax);
 
 int meat(const char *whoami, int bs, int interval, int iterations);
 
@@ -89,9 +89,8 @@ int main(int argc, char *argv[])
     if (optind < argc)
         parsefail(progname);
 
-    readableint(bsr, bs, 16);
     printf("%s: forks: %d; block size: %s; count: %d; sleep: %d\n",
-        progname, forks, bsr, iterations, interval);
+        progname, forks, readableint(bsr, bs, 16), iterations, interval);
 
     if (forks) {
         for (int i = 0; i < forks; i++) {
@@ -134,7 +133,7 @@ int main(int argc, char *argv[])
     } else
         meat(progname, bs, interval, iterations);
     
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
@@ -159,7 +158,7 @@ int parseuint(const char *str, int upperlimit, int lowerlimit)
 }
 
 
-void readableint(char *ha, int hardnum, size_t strmax)
+char *readableint(char *ha, int hardnum, size_t strmax)
 {
     char prefix[4][8] = {"B", "KiB", "MiB", "GiB"};
     int m;
@@ -177,7 +176,7 @@ void readableint(char *ha, int hardnum, size_t strmax)
                 break;
             }
         }
-    return;
+    return ha;
 }
 
 
