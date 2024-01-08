@@ -4,8 +4,8 @@ MemEater 2.0 - (c) 2024 "Brendon Caligari" \<caligari.m0ptp@gmail.com\>
 
 License: GPLv3
 
-This is a tool written for in my free time for my own use and enjoyment
-watching systems break as memory is eaten up.
+This is a tool written in my free time for my own use and enjoyment watching
+systems break as memory is eaten up.
 
 If someone came across this little project and finds a use for it I would
 really appreciate an email.  It'll make my day.
@@ -36,7 +36,6 @@ renamed which may help when going through logs and dumps.
 ### ulimited environment
 
 * `$ ulimit -v $((256*1024))` - ulimit vm value is in kb
-* `$ ulimit -v $((1<<28))`
 
 ```
 $ ./memeater -b $((1 << 26)) -c 5 -i 0

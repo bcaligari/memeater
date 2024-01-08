@@ -2,8 +2,8 @@
     MemEater 2.0 - (c) 2024 "Brendon Caligari" <caligari.m0ptp@gmail.com>
     License: GPLv3
 
-    This is a tool written for personal consumption with the idea of eating up
-    all memory and seeing what happens.
+    This is a tool written in my free time for my own use and enjoyment watching
+    systems break as memory is eaten up.
 */
 
 
