@@ -18,7 +18,7 @@ Usage: memeater [-i secs] [-b bytes] [-c count] [-f forks]
     -b bytes      : bytes per malloc()
     -c count      : number of malloc()s, 0 for infinity
     -f forks      : number of program forks
-    -w chillout   : seconds to wait after last iteration
+    -w chillout   : seconds to sleep after last iteration
 ```
 
 Memeater will `malloc()`, then `memset()`, **-b** bytes every **-i** seconds up

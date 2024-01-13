@@ -203,7 +203,7 @@ int meat(const char *whoami, int bs, int interval, int iterations, int chill)
             // deliberately to stdout
             printf("%s: malloc() failed with %d (%s)\n", whoami, _errno, strerror(_errno));
         } else
-            memset(ptr, (char) random() | 0xFF, (size_t) bs);  // will it blend?
+            memset(ptr, (char) (random() | 0xFF), (size_t) bs);  // will it blend?
         if ((iterations != 1) && (interval > 0))
             sleep(interval);
     }
