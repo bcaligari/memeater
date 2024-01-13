@@ -151,7 +151,7 @@ void parsefail(const char *prg)
     fprintf(stderr, "    -b bytes      : bytes per malloc()\n");
     fprintf(stderr, "    -c count      : number of malloc()s, 0 for infinity\n");
     fprintf(stderr, "    -f forks      : number of program forks\n");
-    fprintf(stderr, "    -w chillout   : seconds to wait after last iteration\n");
+    fprintf(stderr, "    -w chillout   : seconds to sleep after last iteration\n");
     exit(EXIT_FAILURE);
 }
 
