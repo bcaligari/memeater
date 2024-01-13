@@ -31,6 +31,9 @@
 #define ITER_MIN        0
 #define ITER_MAX        2600
 #define ITER_DEF        1
+#define CHILL_MIN       0
+#define CHILL_MAX       60*60*24
+#define CHILL_DEF       0
 
 
 void parsefail(const char *prg);
@@ -39,7 +42,7 @@ int parseuint(const char *str, int upperlimit, int lowerlimit);
 
 char *readableint(char *ha, int hardnum, size_t strmax);
 
-int meat(const char *whoami, int bs, int interval, int iterations);
+int meat(const char *whoami, int bs, int interval, int iterations, int chill);
 
 
 int main(int argc, char *argv[])
@@ -47,11 +50,15 @@ int main(int argc, char *argv[])
     int _errno;
     int opt;
     pid_t forkpid;
-    int bs, interval, iterations, forks;
     char bsr[24];
     char progname[24];
     char newprogname[24];
     int child_status;
+    int forks = FORKS_DEF;
+    int iterations = ITER_DEF;
+    int interval =  INTERVAL_DEF;
+    int bs = BS_DEF;
+    int chill = CHILL_DEF;
 
     memset(progname, 0, (size_t) 24);
     if (prctl(PR_GET_NAME, progname, 0, 0, 0) == -1) {
@@ -59,12 +66,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Unable to get programe name with error %d (%s)", _errno, strerror(-1));
         strncpy(progname, argv[0], (size_t) 16);
     }
-    forks = FORKS_DEF;
-    iterations = ITER_DEF;
-    interval =  INTERVAL_DEF;
-    bs = BS_DEF;
     opterr = 0;
-    while ((opt = getopt(argc, argv, "i:f:b:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:f:b:c:w:")) != -1) {
         switch (opt) {
         case 'i':
             if ((interval = parseuint(optarg, INTERVAL_MAX, INTERVAL_MIN)) == -1)
@@ -80,6 +83,10 @@ int main(int argc, char *argv[])
             break;
         case 'c':
             if ((iterations = parseuint(optarg, ITER_MAX, ITER_MIN)) == -1)
+                parsefail(progname);
+            break;
+        case 'w':
+            if ((chill = parseuint(optarg, CHILL_MAX, CHILL_MIN)) == -1)
                 parsefail(progname);
             break;
         default:
@@ -98,7 +105,7 @@ int main(int argc, char *argv[])
             _errno = errno;
             switch (forkpid) {
             case -1:
-                fprintf(stderr, "fork() for iteration %d failed with %d (%s)\n", _errno, strerror(_errno));
+                fprintf(stderr, "fork() for iteration %d failed with %d (%s)\n", i,  _errno, strerror(_errno));
                 break;
             case 0:
                 snprintf(newprogname, 16, "%s-%d", progname, (int) getpid());
@@ -106,7 +113,7 @@ int main(int argc, char *argv[])
                     _errno = errno;
                     fprintf(stderr, "Unable to change fork name for child %d to \"%s\"\n", (int) getpid(), newprogname);
                 }
-                meat(newprogname, bs, interval, iterations);
+                meat(newprogname, bs, interval, iterations, chill);
                 exit(EXIT_SUCCESS);
                 break;
             default:
@@ -131,7 +138,7 @@ int main(int argc, char *argv[])
             }
         }
     } else
-        meat(progname, bs, interval, iterations);
+        meat(progname, bs, interval, iterations, chill);
     
     return EXIT_SUCCESS;
 }
@@ -144,6 +151,7 @@ void parsefail(const char *prg)
     fprintf(stderr, "    -b bytes      : bytes per malloc()\n");
     fprintf(stderr, "    -c count      : number of malloc()s, 0 for infinity\n");
     fprintf(stderr, "    -f forks      : number of program forks\n");
+    fprintf(stderr, "    -w chillout   : seconds to wait after last iteration\n");
     exit(EXIT_FAILURE);
 }
 
@@ -180,7 +188,7 @@ char *readableint(char *ha, int hardnum, size_t strmax)
 }
 
 
-int meat(const char *whoami, int bs, int interval, int iterations)
+int meat(const char *whoami, int bs, int interval, int iterations, int chill)
 {
     char *ptr;
     int _errno;
@@ -195,9 +203,13 @@ int meat(const char *whoami, int bs, int interval, int iterations)
             // deliberately to stdout
             printf("%s: malloc() failed with %d (%s)\n", whoami, _errno, strerror(_errno));
         } else
-            memset(ptr, (char) random() || 0xFF, (size_t) bs);  // will it blend?
+            memset(ptr, (char) random() | 0xFF, (size_t) bs);  // will it blend?
         if ((iterations != 1) && (interval > 0))
             sleep(interval);
+    }
+    if (chill) {
+        printf("%s: sleeping for %d seconds ...\n", whoami, chill);
+        sleep(chill);
     }
     return 0;
 }
