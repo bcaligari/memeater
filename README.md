@@ -19,6 +19,7 @@ Usage: memeater [-i secs] [-b bytes] [-c count] [-f forks]
     -c count      : number of malloc()s, 0 for infinity
     -f forks      : number of program forks
     -w chillout   : seconds to sleep after last iteration
+    -l            : mark faulted in pages as locked
 ```
 
 Memeater will `malloc()`, then `memset()`, **-b** bytes every **-i** seconds up
@@ -31,6 +32,13 @@ If **-f** is used then one or more memory eating forks are spawned while the
 the parent process will just `wait()` on the forked processes.  Depending on the
 use case even a single fork may be of use, or curiosity.  Forks have the process
 renamed which may help when going through logs and dumps.
+
+With **-l** faulted in pages are marked as locked.
+
+### References
+
+* `/proc/meminfo`
+* `/proc/PID/smaps`
 
 ## Examples
 

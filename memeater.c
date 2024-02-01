@@ -13,10 +13,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <assert.h>
 #include <getopt.h>
+#include <assert.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 
 
 #define BS_MIN          1 << 12             // 4KiB
@@ -42,7 +43,7 @@ int parseuint(const char *str, int upperlimit, int lowerlimit);
 
 char *readableint(char *ha, int hardnum, size_t strmax);
 
-int meat(const char *whoami, int bs, int interval, int iterations, int chill);
+int meat(const char *whoami, int bs, int interval, int iterations, int chill, int lockmem);
 
 
 int main(int argc, char *argv[])
@@ -59,6 +60,7 @@ int main(int argc, char *argv[])
     int interval =  INTERVAL_DEF;
     int bs = BS_DEF;
     int chill = CHILL_DEF;
+    int lockmem = 0;
 
     memset(progname, 0, (size_t) 24);
     if (prctl(PR_GET_NAME, progname, 0, 0, 0) == -1) {
@@ -67,8 +69,11 @@ int main(int argc, char *argv[])
         strncpy(progname, argv[0], (size_t) 16);
     }
     opterr = 0;
-    while ((opt = getopt(argc, argv, "i:f:b:c:w:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:f:b:c:w:l")) != -1) {
         switch (opt) {
+        case 'l':
+            lockmem = 1;
+            break;
         case 'i':
             if ((interval = parseuint(optarg, INTERVAL_MAX, INTERVAL_MIN)) == -1)
                 parsefail(progname);
@@ -96,8 +101,8 @@ int main(int argc, char *argv[])
     if (optind < argc)
         parsefail(progname);
 
-    printf("%s: forks: %d; block size: %s; count: %d; sleep: %d\n",
-        progname, forks, readableint(bsr, bs, 16), iterations, interval);
+    printf("%s(%d); forks: %d; block size: %s; count: %d; sleep: %d; mlockall(): %d\n",
+        progname, (int) getpid(), forks, readableint(bsr, bs, 16), iterations, interval, lockmem);
 
     if (forks) {
         for (int i = 0; i < forks; i++) {
@@ -113,7 +118,7 @@ int main(int argc, char *argv[])
                     _errno = errno;
                     fprintf(stderr, "Unable to change fork name for child %d to \"%s\"\n", (int) getpid(), newprogname);
                 }
-                meat(newprogname, bs, interval, iterations, chill);
+                meat(newprogname, bs, interval, iterations, chill, lockmem);
                 exit(EXIT_SUCCESS);
                 break;
             default:
@@ -138,7 +143,7 @@ int main(int argc, char *argv[])
             }
         }
     } else
-        meat(progname, bs, interval, iterations, chill);
+        meat(progname, bs, interval, iterations, chill, lockmem);
     
     return EXIT_SUCCESS;
 }
@@ -146,12 +151,13 @@ int main(int argc, char *argv[])
 
 void parsefail(const char *prg)
 {
-    fprintf(stderr, "Usage: %s [-i secs] [-b bytes] [-c count] [-f forks]\n", prg);
+    fprintf(stderr, "Usage: %s [-i secs] [-b bytes] [-c count] [-f forks] [-l]\n", prg);
     fprintf(stderr, "    -i secs       : interval sleep between malloc()s\n");
     fprintf(stderr, "    -b bytes      : bytes per malloc()\n");
     fprintf(stderr, "    -c count      : number of malloc()s, 0 for infinity\n");
     fprintf(stderr, "    -f forks      : number of program forks\n");
     fprintf(stderr, "    -w chillout   : seconds to sleep after last iteration\n");
+    fprintf(stderr, "    -l            : mark faulted in pages as locked\n");
     exit(EXIT_FAILURE);
 }
 
@@ -188,10 +194,19 @@ char *readableint(char *ha, int hardnum, size_t strmax)
 }
 
 
-int meat(const char *whoami, int bs, int interval, int iterations, int chill)
+int meat(const char *whoami, int bs, int interval, int iterations, int chill, int lockmem)
 {
     char *ptr;
     int _errno;
+    if (lockmem) {
+        if (mlockall(MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT) == -1) {
+            _errno = errno;
+            printf("%s: mlockall() failed with %d (%s)\n", whoami, _errno, strerror(_errno));
+            printf("%s: proceeding without locking pages.\n", whoami);
+        } else
+            printf("%s: faulted pages are marked locked.\n", whoami);
+    }
+
     srandom((unsigned) iterations);
     for (int i = 0; iterations == 0 || i < iterations; i++) {
         if (iterations != 1)
@@ -200,10 +215,9 @@ int meat(const char *whoami, int bs, int interval, int iterations, int chill)
             printf("%s: malloc()\n", whoami);
         if ((ptr = malloc((size_t) bs)) == NULL) {
             _errno = errno;
-            // deliberately to stdout
             printf("%s: malloc() failed with %d (%s)\n", whoami, _errno, strerror(_errno));
         } else
-            memset(ptr, (char) (random() | 0xFF), (size_t) bs);  // will it blend?
+            memset(ptr, (char) (random() & 0xFF), (size_t) bs);  // will it blend?
         if ((iterations != 1) && (interval > 0))
             sleep(interval);
     }
