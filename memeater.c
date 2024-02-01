@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <getopt.h>
 #include <assert.h>
@@ -20,6 +21,7 @@
 #include <sys/mman.h>
 
 
+#define BI_NAME         "memeater"
 #define BS_MIN          1 << 12             // 4KiB
 #define BS_MAX          1 << 30             // 1GiB
 #define BS_DEF          1 << 25             // 32MiB
@@ -35,6 +37,9 @@
 #define CHILL_MIN       0
 #define CHILL_MAX       60*60*24
 #define CHILL_DEF       0
+#define PNAME_LEN       15
+#define SHORT_LEN       24
+#define SBUF_LEN        32
 
 
 void parsefail(const char *prg);
@@ -51,9 +56,9 @@ int main(int argc, char *argv[])
     int _errno;
     int opt;
     pid_t forkpid;
-    char bsr[24];
-    char progname[24];
-    char newprogname[24];
+    char bsr[SBUF_LEN];
+    char progname[SBUF_LEN];
+    char pidstr[SBUF_LEN];
     int child_status;
     int forks = FORKS_DEF;
     int iterations = ITER_DEF;
@@ -62,11 +67,11 @@ int main(int argc, char *argv[])
     int chill = CHILL_DEF;
     int lockmem = 0;
 
-    memset(progname, 0, (size_t) 24);
+    bzero(progname, (size_t) SBUF_LEN);
     if (prctl(PR_GET_NAME, progname, 0, 0, 0) == -1) {
         _errno = errno;
-        fprintf(stderr, "Unable to get programe name with error %d (%s)", _errno, strerror(-1));
-        strncpy(progname, argv[0], (size_t) 16);
+        fprintf(stderr, "Unable to get programe name with error %d (%s)\n", _errno, strerror(-1));
+        memcpy(progname, BI_NAME, strlen(BI_NAME));
     }
     opterr = 0;
     while ((opt = getopt(argc, argv, "i:f:b:c:w:l")) != -1) {
@@ -102,7 +107,7 @@ int main(int argc, char *argv[])
         parsefail(progname);
 
     printf("%s(%d); forks: %d; block size: %s; count: %d; sleep: %d; mlockall(): %d\n",
-        progname, (int) getpid(), forks, readableint(bsr, bs, 16), iterations, interval, lockmem);
+        progname, (int) getpid(), forks, readableint(bsr, bs, SHORT_LEN), iterations, interval, lockmem);
 
     if (forks) {
         for (int i = 0; i < forks; i++) {
@@ -113,14 +118,17 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "fork() for iteration %d failed with %d (%s)\n", i,  _errno, strerror(_errno));
                 break;
             case 0:
-                snprintf(newprogname, 16, "%s-%d", progname, (int) getpid());
-                if (prctl(PR_SET_NAME, newprogname, 0, 0, 0) == -1) {
+                snprintf(pidstr, SBUF_LEN, "-%d", (int) getpid());
+                if ((strlen(pidstr) + strlen(progname)) < PNAME_LEN)
+                    strcat(progname, pidstr);
+                else
+                    memcpy(progname + (PNAME_LEN - strlen(pidstr)), pidstr, strlen(pidstr));
+                if (prctl(PR_SET_NAME, progname, 0, 0, 0) == -1) {
                     _errno = errno;
-                    fprintf(stderr, "Unable to change fork name for child %d to \"%s\"\n", (int) getpid(), newprogname);
+                    fprintf(stderr, "Unable to change fork name for child %d to \"%s\"\n", (int) getpid(), progname);
                 }
-                meat(newprogname, bs, interval, iterations, chill, lockmem);
+                meat(progname, bs, interval, iterations, chill, lockmem);
                 exit(EXIT_SUCCESS);
-                break;
             default:
                 printf("%s: forked %d ...\n", progname, forkpid);
             }
