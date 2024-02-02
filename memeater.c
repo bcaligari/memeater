@@ -48,7 +48,7 @@ int parseuint(const char *str, int upperlimit, int lowerlimit);
 
 char *readableint(char *ha, int hardnum, size_t strmax);
 
-int meat(const char *whoami, int bs, int interval, int iterations, int chill, int lockmem);
+int meat(const char *whoami, int bs, int interval, int iterations, int chill, int lockmem, int nofill);
 
 
 int main(int argc, char *argv[])
@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
     int bs = BS_DEF;
     int chill = CHILL_DEF;
     int lockmem = 0;
+    int nofill = 0;
 
     bzero(progname, (size_t) SBUF_LEN);
     if (prctl(PR_GET_NAME, progname, 0, 0, 0) == -1) {
@@ -74,8 +75,11 @@ int main(int argc, char *argv[])
         memcpy(progname, BI_NAME, strlen(BI_NAME));
     }
     opterr = 0;
-    while ((opt = getopt(argc, argv, "i:f:b:c:w:l")) != -1) {
+    while ((opt = getopt(argc, argv, "i:f:b:c:w:ln")) != -1) {
         switch (opt) {
+        case 'n':
+            nofill = 1;
+            break;
         case 'l':
             lockmem = 1;
             break;
@@ -106,8 +110,8 @@ int main(int argc, char *argv[])
     if (optind < argc)
         parsefail(progname);
 
-    printf("%s(%d); forks: %d; block size: %s; count: %d; sleep: %d; mlockall(): %d\n",
-        progname, (int) getpid(), forks, readableint(bsr, bs, SHORT_LEN), iterations, interval, lockmem);
+    printf("%s(%d); forks: %d; block size: %s; count: %d; sleep: %d; mlockall: %d, nofill: %d\n",
+        progname, (int) getpid(), forks, readableint(bsr, bs, SHORT_LEN), iterations, interval, lockmem, nofill);
 
     if (forks) {
         for (int i = 0; i < forks; i++) {
@@ -127,7 +131,7 @@ int main(int argc, char *argv[])
                     _errno = errno;
                     fprintf(stderr, "Unable to change fork name for child %d to \"%s\"\n", (int) getpid(), progname);
                 }
-                meat(progname, bs, interval, iterations, chill, lockmem);
+                meat(progname, bs, interval, iterations, chill, lockmem, nofill);
                 exit(EXIT_SUCCESS);
             default:
                 printf("%s: forked %d ...\n", progname, forkpid);
@@ -151,7 +155,7 @@ int main(int argc, char *argv[])
             }
         }
     } else
-        meat(progname, bs, interval, iterations, chill, lockmem);
+        meat(progname, bs, interval, iterations, chill, lockmem, nofill);
     
     return EXIT_SUCCESS;
 }
@@ -166,6 +170,7 @@ void parsefail(const char *prg)
     fprintf(stderr, "    -f forks      : number of program forks\n");
     fprintf(stderr, "    -w chillout   : seconds to sleep after last iteration\n");
     fprintf(stderr, "    -l            : mark faulted in pages as locked\n");
+    fprintf(stderr, "    -n            : do not fill memory allocations\n");
     exit(EXIT_FAILURE);
 }
 
@@ -202,7 +207,7 @@ char *readableint(char *ha, int hardnum, size_t strmax)
 }
 
 
-int meat(const char *whoami, int bs, int interval, int iterations, int chill, int lockmem)
+int meat(const char *whoami, int bs, int interval, int iterations, int chill, int lockmem, int nofill)
 {
     char *ptr;
     int _errno;
@@ -224,8 +229,8 @@ int meat(const char *whoami, int bs, int interval, int iterations, int chill, in
         if ((ptr = malloc((size_t) bs)) == NULL) {
             _errno = errno;
             printf("%s: malloc() failed with %d (%s)\n", whoami, _errno, strerror(_errno));
-        } else
-            memset(ptr, (char) (random() & 0xFF), (size_t) bs);  // will it blend?
+        } else if (!nofill)
+            memset(ptr, (char) (random() & 0xFF), (size_t) bs);
         if ((iterations != 1) && (interval > 0))
             sleep(interval);
     }
