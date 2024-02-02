@@ -20,6 +20,7 @@ Usage: memeater [-i secs] [-b bytes] [-c count] [-f forks]
     -f forks      : number of program forks
     -w chillout   : seconds to sleep after last iteration
     -l            : mark faulted in pages as locked
+    -n            : do not fill memory allocations
 ```
 
 Memeater will `malloc()`, then `memset()`, **-b** bytes every **-i** seconds up
@@ -39,6 +40,8 @@ With **-l** faulted in pages are marked as locked.
 
 * `/proc/meminfo`
 * `/proc/PID/smaps`
+* `/proc/PID/maps`
+* `/proc/PID/status`
 
 ## Examples
 
